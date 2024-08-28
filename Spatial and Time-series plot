@@ -1,0 +1,178 @@
+temp_2022_1 <- subset(df_2022_temp, Day %in% c(1,15,30))
+
+# 시각화
+temp_plot <- ggplot(temp_2022_1) + 
+  geom_point(aes(x = long, y = lat, colour = z), size = 1.5) +
+  scale_colour_gradient(name = "degC", low = "dodgerblue", high = "firebrick") +  # 색상 스케일 설정
+  xlab("Longitude") + ylab('Latitude') +
+  geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+  facet_wrap(~Date, nrow = 3) +
+  coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+  theme_bw()
+
+# 결과 플롯 출력
+temp_plot
+
+
+# Time_series 차트 그리기
+
+ids <- unique(df_2022_temp$Location)
+ids_sub <- sample(ids, 10)
+temp_2022_sub <- filter(df_2022_temp, Location %in% ids_sub)
+
+temp_TSplot <- ggplot(temp_2022_sub) +
+  geom_line(aes(x = t, y = z)) +
+  facet_wrap(~Location, ncol = 5) +
+  xlab('Day') + ylab('Temp') + theme_bw() +
+  theme(panel.spacing = unit(1, 'lines'))
+
+
+# 평균 데이터 계산
+temp_2022_sub_mean <- temp_2022_sub %>%
+  group_by(t) %>%  # 시간(t)에 따라 그룹화
+  summarise(mean_z = mean(z))  # z의 평균 계산
+
+# 그래프 그리기
+temp_TSplot_add <- ggplot(temp_2022_sub, aes(x = t, y = z, group = Location)) +
+  geom_line(alpha = 0.3) +  # 모든 선을 투명하게 그리기
+  geom_line(data = temp_2022_sub_mean, aes(x = t, y = mean_z), color = 'yellow', size = 1, inherit.aes = FALSE) +  # 평균선 추가
+  xlab('Day') + ylab('Temp') +
+  theme_bw()
+
+# 그래프 출력
+print(temp_TSplot_add)
+
+
+# 데이터 뽑기
+fda_ts <- matrix(df_2022_temp$z, nrow = 365)
+
+B25.basis <- create.bspline.basis(rangeval = c(0,365), nbasis = 25)
+Wiener.fd = smooth.basis(y = fda_ts, fdParobj = B25.basis)
+
+plot(Wiener.fd)
+
+W.mean <- mean.fd(Wiener.fd$fd)
+
+library(fda)
+# W.mean에서 데이터 추출
+t_values <- c(1:365)  # 예: 0부터 365까지의 일자
+mean_values <- eval.fd(t_values, W.mean)
+
+# 데이터 프레임 생성
+mean_df <- data.frame(t = t_values, mean_z = mean_values)
+
+# 그래프 그리기
+temp_FDA_TSplot <- ggplot(df_2022_temp, aes(x = t, y = z, group = Location), size = 0.001, alpha = 0.2) +
+  geom_line() +  # 모든 선을 투명하게 그리기
+  geom_line(data = mean_df, aes(x = t, y = mean), color = 'orange', size = 1, inherit.aes = FALSE) +  # W.mean으로 평균선 추가
+  xlab('Day') + ylab('Temp') +
+  theme_bw()
+
+# 그래프 출력
+print(temp_FDA_TSplot)
+
+# 그래프 그리기
+ggplot(data = mean_df, aes(x = t, y = mean), color = 'orange', size = 1, inherit.aes = FALSE) +
+  geom_line() +  # 모든 선을 투명하게 그리기
+  xlab('Day') + ylab('Temp') +
+  theme_bw()
+
+df_temp <- df_climate %>% filter(proc == 'temp')
+
+df_July <- df_climate %>% filter(Month == "07", proc == 'temp')
+
+# 1부터 365까지 반복되는 벡터 생성
+df_July$t <- rep(year, length.out = nrow(df_July))
+
+df_July$Day <- as.numeric(df_July$Day)
+
+July_1 <- subset(df_July, Day %in% c(1,16))
+
+# July_1 <- df_July %>% group_by(Year, Location) %>% summarise(mean_z = mean(z))
+
+July_1 <- merge(July_1, locs, by = 'Location')
+
+# 시각화
+July_plot <- ggplot(July_1) + 
+  geom_point(aes(x = long, y = lat, colour = mean_z), size = 1.5) +
+  scale_colour_gradient(name = "degC", low = "greenyellow", high = "firebrick") +  # 색상 스케일 설정
+  xlab("Longitude") + ylab('Latitude') +
+  geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+  facet_wrap(~Year, nrow = 6) +
+  coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+  theme_bw()
+
+July_plot
+
+
+# df_August <- df_climate %>% filter(Month == "08", proc == 'temp')
+# 
+# df_August$Day <- as.numeric(df_August$Day)
+# 
+# August_1 <- df_August %>% group_by(Year, Location) %>% summarise(var_z = var(z))
+# 
+# August_1 <- merge(August_1, locs, by = 'Location')
+# 
+# # 시각화
+# August_plot <- ggplot(August_1) + 
+#   geom_point(aes(x = long, y = lat, colour = var_z), size = 1.5) +
+#   scale_colour_gradient(name = "degC", low = "greenyellow", high = "firebrick") +  # 색상 스케일 설정
+#   xlab("Longitude") + ylab('Latitude') +
+#   geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+#   facet_wrap(~Year, nrow = 6) +
+#   coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+#   theme_bw()
+# 
+# August_plot
+
+
+# df_summer <- df_climate %>% filter(Month == c("06", "07", "08"), proc == 'temp')
+# 
+# df_summer$Day <- as.numeric(df_summer$Day)
+# summer_1 <- df_summer %>% group_by(Year, Location) %>% summarise(var_z = var(z))
+# summer_1 <- merge(summer_1, locs, by = 'Location')
+# # 시각화
+# summer_plot <- ggplot(summer_1) +
+#   geom_point(aes(x = long, y = lat, colour = var_z), size = 1.5) +
+#   scale_colour_gradient(name = "degC", low = "greenyellow", high = "firebrick") +  # 색상 스케일 설정
+#   xlab("Longitude") + ylab('Latitude') +
+#   geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+#   facet_wrap(~Year, nrow = 6) +
+#   coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+#   theme_bw()
+# summer_plot
+
+
+# Time_series 차트 그리기
+
+ids <- unique(df_July$Location)
+ids_sub <- sample(ids, 10)
+July_sub <- filter(df_July, Location %in% ids_sub)
+
+July_sub <- July_sub %>% group_by(Year, Location) %>% summarise(mean_z = mean(z))
+July_TS <- merge(July_sub, locs, by = 'Location')
+
+July_TSplot <- ggplot(July_TS) +
+  geom_line(aes(x = Year, y = mean_z)) +
+  facet_wrap(~Location, ncol = 5) +
+  xlab('Day') + ylab('Temp') + theme_bw() +
+  theme(panel.spacing = unit(1, 'lines'))
+
+
+July_TSplot
+
+# 평균 데이터 계산
+temp_2022_sub_mean <- temp_2022_sub %>%
+  group_by(t) %>%  # 시간(t)에 따라 그룹화
+  summarise(mean_z = mean(z))  # z의 평균 계산
+
+
+# 그래프 그리기
+temp_TSplot_add <- ggplot(temp_2022_sub, aes(x = t, y = z, group = Location)) +
+  geom_line(alpha = 0.3) +  # 모든 선을 투명하게 그리기
+  geom_line(data = temp_2022_sub_mean, aes(x = t, y = mean_z), color = 'yellow', size = 1, inherit.aes = FALSE) +  # 평균선 추가
+  xlab('Day') + ylab('Temp') +
+  theme_bw()
+
+# 그래프 출력
+print(temp_TSplot_add)
