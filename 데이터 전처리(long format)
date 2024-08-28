@@ -1,0 +1,163 @@
+# 필요한 패키지 설치
+install.packages("rnaturalearth")
+install.packages("rnaturalearthdata")
+install.packages("sf")
+install.packages("ggplot2")
+install.packages("dplyr")
+install.packages("refund")
+
+
+
+# 패키지 로드
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf)
+library(ggplot2)
+library(dplyr)
+library("CCA")
+library("dplyr")
+library("ggplot2")
+library("gstat")
+library("sp")
+library("spacetime")
+library("STRbook")
+library(reshape2)
+library(tidyr)
+library(refund)
+
+
+#데이터 전처리
+
+md <- matrix(c(1:365),365,2)
+
+md[,1] <- format(as.Date(md[,1]-1), "%m")
+md[,2] <- format(as.Date(as.numeric(md[,2])-1), "%d")
+
+
+# rainfall
+
+# 3차원 배열을 long-format으로 변환
+rainfall_long <- melt(rainfall)
+
+# 열 이름 변경 (Day, Year, Location, Rainfall)
+colnames(rainfall_long) <- c("Day", "Year", "Location", "Rainfall")
+
+# Year와 Location 데이터를 추가
+rainfall_long$Year <- year[rainfall_long$Year]
+rainfall_long$Month <- md[rainfall_long$Day, 1]
+rainfall_long$Day <- md[rainfall_long$Day, 2]
+rainfall_long$Location <- locs[rainfall_long$Location, 1] 
+
+
+# 칼럼 순서를 지정하여 데이터 프레임을 재배열
+rainfall_long <- rainfall_long[, c("Year", "Month", "Day", "Location", "Rainfall")]
+
+
+# Year, Month, Day를 합쳐서 날짜 생성
+rainfall_long$Date <- as.Date(paste(rainfall_long$Year, rainfall_long$Month, rainfall_long$Day, sep = "-"))
+
+colnames(locs)[1] <- 'Location'
+
+rainfall_long <- merge(rainfall_long, locs, by = 'Location')
+head(rainfall_long)
+
+
+#temp
+
+# 3차원 배열을 long-format으로 변환
+temp_long <- melt(temp)
+
+# 열 이름 변경 (Day, Year, Location, temp)
+colnames(temp_long) <- c("Day", "Year", "Location", "temp")
+
+# Year와 Location 데이터를 추가
+temp_long$Year <- year[temp_long$Year]
+temp_long$Month <- md[temp_long$Day, 1]
+temp_long$Day <- md[temp_long$Day, 2]
+temp_long$Location <- locs[temp_long$Location, 1] 
+
+# 칼럼 순서를 지정하여 데이터 프레임을 재배열
+temp_long <- temp_long[, c("Year", "Month", "Day", "Location", "temp")]
+
+# Year, Month, Day를 합쳐서 날짜 생성
+temp_long$Date <- as.Date(paste(temp_long$Year, temp_long$Month, temp_long$Day, sep = "-"))
+colnames(locs)[1] <- 'Location'
+
+temp_long <- merge(temp_long, locs, by = 'Location')
+head(temp_long)
+
+
+# surface
+
+# 3차원 배열을 long-format으로 변환
+surface_long <- melt(surface)
+
+# 열 이름 변경 (Day, Year, Location, surface)
+colnames(surface_long) <- c("Day", "Year", "Location", "surface")
+
+# Year와 Location 데이터를 추가
+surface_long$Year <- year[surface_long$Year]
+surface_long$Month <- md[surface_long$Day, 1]
+surface_long$Day <- md[surface_long$Day, 2]
+surface_long$Location <- locs[surface_long$Location, 1] 
+
+# 칼럼 순서를 지정하여 데이터 프레임을 재배열
+surface_long <- surface_long[, c("Year", "Month", "Day", "Location", "surface")]
+
+# Year, Month, Day를 합쳐서 날짜 생성
+surface_long$Date <- as.Date(paste(surface_long$Year, surface_long$Month, surface_long$Day, sep = "-"))
+colnames(locs)[1] <- 'Location'
+surface_long <- merge(surface_long, locs, by = 'Location')
+head(surface_long)
+
+colnames(rainfall_long)[5] <- 'z'
+colnames(temp_long)[5] <- 'z'
+colnames(surface_long)[5] <- 'z'
+
+rainfall_long$proc <- 'rainfall'
+temp_long$proc <- 'temp'
+surface_long$proc <- 'surface'
+
+df_climate <- rbind(rainfall_long, temp_long, surface_long)
+
+df_2022_temp <- df_climate %>% filter(Year == 2022, proc == 'temp')
+
+
+df_2022_temp$Date <- as.Date(df_2022_temp$Date)
+
+spat_part <- SpatialPoints(coords = df_2022_temp[,c('long', 'lat')])
+temp_part <- unique(df_2022_temp$Date)
+
+STObj2 <- STIDF(sp = spat_part, time = temp_part, data = dplyr::select(df_2022_temp, -Date, -long, -lat))
+
+# Year, Month, Day를 모두 character 타입으로 변환
+df_2022_temp$Year <- as.numeric(df_2022_temp$Year)
+df_2022_temp$Month <- as.numeric(df_2022_temp$Month)
+df_2022_temp$Day <- as.numeric(df_2022_temp$Day)
+df_2022_temp$Location <- as.numeric(df_2022_temp$Location)
+
+
+# pivot_longer를 사용하여 long format으로 변환
+df_long <- pivot_longer(
+  df_2022_temp,
+  cols = c("Year", "Month", "Day"),
+  names_to = "DatePart",
+  values_to = "Value"
+)
+
+# temp_part를 오름차순으로 정렬
+temp_part <- sort(temp_part)
+
+# df_long 데이터를 시간 순서대로 정렬
+df_long <- df_2022_temp %>% arrange(Date, Location)
+
+spat_part <- SpatialPoints(coords = locs[,c('long', 'lat')])
+
+# STFDF 객체 생성
+STObj3 <- STFDF(sp = spat_part, time = temp_part, data = df_long)
+
+# 데이터프레임의 행 수 확인
+n_rows <- nrow(df_2022_temp)
+
+# 1부터 365까지 반복되는 벡터 생성
+df_2022_temp$t <- rep(1:365, length.out = n_rows)
