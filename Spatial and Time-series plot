@@ -161,18 +161,16 @@ July_TSplot <- ggplot(July_TS) +
 
 July_TSplot
 
-# 평균 데이터 계산
-temp_2022_sub_mean <- temp_2022_sub %>%
-  group_by(t) %>%  # 시간(t)에 따라 그룹화
-  summarise(mean_z = mean(z))  # z의 평균 계산
+# max, min 구간을 추가
+July_sub_1 <- July_sub %>% group_by(Year, Location) %>% summarise(mean_z = mean(z), max_z = max(z), min_z = min(z))
+July_TSplot <- ggplot(July_sub_1, aes(x = Year, y = mean_z)) +
+  geom_ribbon(aes(ymin = min_z, ymax = max_z), fill = "deepskyblue", alpha = 0.3) +  # min-max 구간을 리본으로 표현
+  geom_line(color = "blue") +  # 평균선
+  facet_wrap(~Location, ncol = 5) +
+  xlab('Year') + ylab('Temp (July)') + 
+  theme_bw() +
+  theme(panel.spacing = unit(1, 'lines'))
+
+July_TSplot
 
 
-# 그래프 그리기
-temp_TSplot_add <- ggplot(temp_2022_sub, aes(x = t, y = z, group = Location)) +
-  geom_line(alpha = 0.3) +  # 모든 선을 투명하게 그리기
-  geom_line(data = temp_2022_sub_mean, aes(x = t, y = mean_z), color = 'yellow', size = 1, inherit.aes = FALSE) +  # 평균선 추가
-  xlab('Day') + ylab('Temp') +
-  theme_bw()
-
-# 그래프 출력
-print(temp_TSplot_add)
