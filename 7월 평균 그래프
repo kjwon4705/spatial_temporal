@@ -1,6 +1,8 @@
-July <- df_climate %>% filter(Month == "07", proc == "temp")
+# 속초 7월 평균 그래프
 
+July <- df_climate %>% filter(Month == "07", proc == "temp")
 July$Day <- as.numeric(July$Day)
+
 
 July_90 <- July %>% filter(Location == 90) 
 
@@ -13,9 +15,12 @@ ggplot(July_90, aes(x = Day, y = z, color = factor(Year), group = Year)) +
        color = "Year") +
   theme_minimal()
 
+# 서울 기온 평균 그래프
+
+
 July_108 <- July %>% filter(Location == 108) 
 
-# tsplot을 Year 별로 겹쳐 그리기
+# tsplot을 Year 별 그리기
 ggplot(July_108, aes(x = Day, y = z, color = factor(Year), group = Year)) +
   geom_line(alpha = 0.5) +
   labs(title = "Temperature Trend by Year",
@@ -28,6 +33,7 @@ ggplot(July_108, aes(x = Day, y = z, color = factor(Year), group = Year)) +
 July_108$Year <- as.numeric(July_108$Year)
 
 
+# 6년 단위 평균 선 그래프 추가
 # 6년 단위로 그룹화하기 위해 새로운 변수를 생성
 July_108 <- July_108 %>%
   mutate(YearGroup = cut(Year, breaks = seq(1981, 2023, by = 6), include.lowest = TRUE, labels = FALSE))
@@ -62,7 +68,7 @@ seoul_plot <- ggplot() +
 seoul_plot
 
 
-
+# 모든 지역에 대한 7월 평균 기온 그래프
 # 각 year 별로 평균 그래프 그리기
 
 mean_July <- July %>% group_by(Year, Day) %>% summarise(mean_temp = mean(z))
