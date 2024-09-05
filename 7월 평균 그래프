@@ -1,0 +1,78 @@
+July <- df_climate %>% filter(Month == "07", proc == "temp")
+
+July$Day <- as.numeric(July$Day)
+
+July_90 <- July %>% filter(Location == 90) 
+
+# tsplot을 Year 별로 겹쳐 그리기
+ggplot(July_90, aes(x = Day, y = z, color = factor(Year), group = Year)) +
+  geom_line() +
+  labs(title = "Temperature Trend by Year",
+       x = "Day",
+       y = "Temperature (z)",
+       color = "Year") +
+  theme_minimal()
+
+July_108 <- July %>% filter(Location == 108) 
+
+# tsplot을 Year 별로 겹쳐 그리기
+ggplot(July_108, aes(x = Day, y = z, color = factor(Year), group = Year)) +
+  geom_line(alpha = 0.5) +
+  labs(title = "Temperature Trend by Year",
+       x = "Day",
+       y = "Temperature (z)",
+       color = "Year") +
+  theme_minimal()
+
+# Year를 연속형으로 변환
+July_108$Year <- as.numeric(July_108$Year)
+
+
+# 6년 단위로 그룹화하기 위해 새로운 변수를 생성
+July_108 <- July_108 %>%
+  mutate(YearGroup = cut(Year, breaks = seq(1981, 2023, by = 6), include.lowest = TRUE, labels = FALSE))
+
+# 그룹별로 평균값 계산
+grouped_mean <- July_108 %>%
+  group_by(YearGroup, Day) %>%
+  summarize(mean_z = mean(z), .groups = 'drop')
+
+# ggnewscale 패키지 설치 및 로드
+install.packages("ggnewscale")
+library(ggnewscale)
+
+# tsplot을 Year 별로 겹쳐 그리기
+seoul_plot <- ggplot() +
+  # 원래 데이터의 라인 플롯
+  geom_line(data = July_108, aes(x = Day, y = z, group = Year, color = Year), alpha = 0.2) +
+  scale_color_gradient(low = "lightblue", high = "darkblue") + # 일반 데이터의 색상 그라데이션
+  
+  ggnewscale::new_scale_color() + # 새로운 색상 스케일을 추가
+  
+  # 평균 데이터의 라인 플롯
+  geom_line(data = grouped_mean, aes(x = Day, y = mean_z, group = YearGroup, color = YearGroup), size = 1.5) +
+  scale_color_gradient(low = "greenyellow", high = "firebrick") + # 평균선의 색상 그라데이션
+  
+  labs(title = "Temperature Trend by Year with 6-Year Group Averages",
+       x = "Day",
+       y = "Temperature (z)",
+       color = "Year / Group") +
+  theme_minimal()
+
+seoul_plot
+
+
+
+# 각 year 별로 평균 그래프 그리기
+
+mean_July <- July %>% group_by(Year, Day) %>% summarise(mean_temp = mean(z))
+
+
+# x축은 Day, y축은 mean_temp, 그리고 color를 Year로 설정하여 그래프 그리기
+ggplot(mean_July, aes(x = Day, y = mean_temp, color = factor(Year))) +
+  geom_line() +
+  labs(title = "Average Temperature in July by Day and Year",
+       x = "Day (July 1st - July 30th)",
+       y = "Mean Temperature",
+       color = "Year") +
+  theme_minimal()
