@@ -1,0 +1,45 @@
+
+## ------------------------------------------------------------------------
+G <- auto_basis(data = July_3[,c("lon","lat")] %>%  
+                  SpatialPoints(),           
+                nres = 1,                         
+                type = "Gaussian")                
+
+## ------------------------------------------------------------------------
+S <- eval_basis(basis = G,                     # basis functions
+                s = July_3[,c("lon","lat")] %>%  # spat locations
+                  as.matrix()) %>%          # conv. to matrix
+  as.matrix()                               # results as matrix
+colnames(S) <- paste0("B", 1:ncol(S)) # assign column names
+
+## ------------------------------------------------------------------------
+July_temp_2 <- cbind(July_3, S) %>%             # append S to Tmax
+  dplyr::select(-mean_z_surface, -ele, -max_z_rainfall, -mean_z_rainfall,-max_z_temp,-max_z_surface, -lat_group_custom, -long_group_custom, -city)         # will not be using in
+# the model
+
+## ------------------------------------------------------------------------
+temp_July_lm <- lm(mean_z_temp ~ (lon + lat)^2 + .,     # model
+                   data = dplyr::select(July_temp_2, -Location))  # omit id
+
+## ------------------------------------------------------------------------
+temp_July_lm %>% summary()
+
+## ------------------------------------------------------------------------
+Temp_July_lm4 <- list()   # initialize
+for(i in 0:4) {           # for four steps (after intercept model)
+  ## Carry out stepwise forward selection for i steps
+  Temp_July_lm4[[i+1]] <- step(lm(mean_z_temp ~ 1,
+                                  data = dplyr::select(July_temp_2, -Location)),
+                               scope = mean_z_temp ~(lon + lat+Year)^2 + .,
+                               direction = 'forward',
+                               steps = i)
+}
+Temp_July_lm4
+
+
+## ------------------------------------------------------------------------
+Tmax_July_gls <- gls(mean_z_temp ~ (lon + lat + Year)^2 + .,
+                     data = dplyr::select(July_temp_2, -Location),
+                     correlation = corGaus(value = 0.5,
+                                           form = ~ lon + lat + Year,
+                                           fixed = TRUE))
