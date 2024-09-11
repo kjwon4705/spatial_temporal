@@ -1,0 +1,260 @@
+
+ST_wide_July
+
+nt <- nrow(ST_wide_July)
+# 1. 데이터 준비
+X <- temp_U[, 1:3] * sqrt(nt - 1)
+Y <- rainfall_U[,1:3] * sqrt(nt - 1)
+
+
+# 2. CCA 수행
+cc <- cancor(X, Y)
+
+# Canonical Variables
+CCA_df <- data.frame(t = 1:nt, CCAvar1 = (X %*% cc$xcoef[,1])[,1], CCAvar2 = (Y %*% cc$ycoef[,1])[,1])
+
+t_breaks <- seq(1, nt, length.out = 6)
+year_breaks <- seq(1981, 2022, length.out = 6)
+
+ggplot(CCA_df) + 
+  geom_line(aes(t, CCAvar1), col = 'steelblue') +
+  geom_line(aes(t, CCAvar2), col= 'firebrick')
+
+temp_U_df <- cbind(locs, temp_U[,1]) 
+
+
+### 전체 년도 CCA
+
+T_ST_wide <- df_climate %>%
+  filter(proc == 'temp') %>%  # 'temp' 데이터를 필터링
+  mutate(YearMonth = paste(Year, sprintf("%02d", Month), sep = "-")) %>%  # Year-Month 열 생성
+  group_by(Location, YearMonth) %>%  # Location과 YearMonth로 그룹화
+  summarise(avg_temp = mean(z, na.rm = TRUE)) %>%  # 평균 계산
+  ungroup() %>%
+  pivot_wider(names_from = YearMonth, values_from = avg_temp)  # wide 형식으로 변환
+
+
+T_ST_wide <- t(T_ST_wide)
+colnames(T_ST_wide) <- T_ST_wide[1,]
+
+T_ST_wide<- T_ST_wide[-1,]
+
+# 데이터 변환
+Z <- as.matrix(T_ST_wide)  # ST_wide를 행렬로 변환
+nT <- nrow(Z)  # 시간 (행)의 수
+nSpace <- ncol(Z)  # 공간적 위치 (열)의 수
+
+# 공간적 평균을 계산하여 Z에서 빼기
+spat_mean <- colMeans(Z, na.rm = TRUE)
+Zspat_detrend <- scale(Z, center = spat_mean, scale = FALSE)  # 공간적 평균 제거
+
+# SVD를 위한 데이터 표준화
+Zt <- 1/sqrt(nT - 1) * Zspat_detrend
+
+# SVD 수행
+E <- svd(Zt)
+
+# EOFs 및 PCs 얻기
+V <- E$v  # EOFs
+U <- E$u  # Principal Components (PCs)
+D <- E$d  # Singular values
+
+# EOFs를 데이터 프레임으로 변환하고 열 이름 지정
+colnames(V) <- paste0("EOF", 1:ncol(V))  # EOF1, EOF2, ..., EOFn 이름 지정
+EOFs <- as.data.frame(V)
+EOFs <- cbind(Location = colnames(ST_wide), EOFs)  # Location 정보 추가
+
+EOFs$Location <- as.numeric(EOFs$Location)
+
+# SVD 결과에서 특이값 사용
+singular_values <- E$d
+
+# 고유값 계산 (특이값의 제곱)
+eigenvalues <- singular_values^2
+
+# 각 주성분의 분산 비율 계산
+proportion_variance_explained <- eigenvalues / sum(eigenvalues)
+
+# locs 데이터 프레임에서 필요한 열 선택 (Location, long, lat)
+locs_subset <- locs %>% dplyr::select(Location, long, lat)
+
+EOFs[,1] <- as.integer(EOFs[,1])
+
+# EOFs 데이터 프레임에 locs 데이터 프레임의 long, lat 정보 추가
+T_EOFs <- EOFs %>%
+  left_join(locs_subset, by = "Location")
+
+ggplot(T_EOFs) + 
+  geom_point(aes(x = long, y = lat, color = EOF1)) +  # 타일 그래프 (fill로 매핑)
+  scale_fill_viridis_c(name = "degC") +  # 색상 스케일 (색상 맵 설정)
+  theme_bw() +  # 흑백 테마
+  xlab("Longitude (deg)") +  # x축 레이블
+  ylab("Latitude (deg)") +  # y축 레이블
+  geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+  coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+  ggtitle("First EOF - Spatial Distribution")  # 그래프 제목
+
+
+
+
+R_ST_wide <- df_climate %>%
+  filter(proc == 'rainfall') %>%  # 'temp' 데이터를 필터링
+  mutate(YearMonth = paste(Year, sprintf("%02d", Month), sep = "-")) %>%  # Year-Month 열 생성
+  group_by(Location, YearMonth) %>%  # Location과 YearMonth로 그룹화
+  summarise(avg_temp = mean(z, na.rm = TRUE)) %>%  # 평균 계산
+  ungroup() %>%
+  pivot_wider(names_from = YearMonth, values_from = avg_temp)  # wide 형식으로 변환
+
+
+R_ST_wide <- t(R_ST_wide)
+colnames(R_ST_wide) <- R_ST_wide[1,]
+
+R_ST_wide<- R_ST_wide[-1,]
+
+# 데이터 변환
+Z <- as.matrix(R_ST_wide)  # ST_wide를 행렬로 변환
+nT <- nrow(Z)  # 시간 (행)의 수
+nSpace <- ncol(Z)  # 공간적 위치 (열)의 수
+
+# 공간적 평균을 계산하여 Z에서 빼기
+spat_mean <- colMeans(Z, na.rm = TRUE)
+Zspat_detrend <- scale(Z, center = spat_mean, scale = FALSE)  # 공간적 평균 제거
+
+# SVD를 위한 데이터 표준화
+Zt <- 1/sqrt(nT - 1) * Zspat_detrend
+
+# SVD 수행
+E <- svd(Zt)
+
+# EOFs 및 PCs 얻기
+V <- E$v  # EOFs
+U <- E$u  # Principal Components (PCs)
+D <- E$d  # Singular values
+
+# EOFs를 데이터 프레임으로 변환하고 열 이름 지정
+colnames(V) <- paste0("EOF", 1:ncol(V))  # EOF1, EOF2, ..., EOFn 이름 지정
+EOFs <- as.data.frame(V)
+EOFs <- cbind(Location = colnames(ST_wide), EOFs)  # Location 정보 추가
+
+EOFs$Location <- as.numeric(EOFs$Location)
+
+# SVD 결과에서 특이값 사용
+singular_values <- E$d
+
+# 고유값 계산 (특이값의 제곱)
+eigenvalues <- singular_values^2
+
+# 각 주성분의 분산 비율 계산
+proportion_variance_explained <- eigenvalues / sum(eigenvalues)
+
+# locs 데이터 프레임에서 필요한 열 선택 (Location, long, lat)
+locs_subset <- locs %>% dplyr::select(Location, long, lat)
+
+EOFs[,1] <- as.integer(EOFs[,1])
+
+# EOFs 데이터 프레임에 locs 데이터 프레임의 long, lat 정보 추가
+R_EOFs <- EOFs %>%
+  left_join(locs_subset, by = "Location")
+
+ggplot(R_EOFs) + 
+  geom_point(aes(x = long, y = lat, color = EOF1)) +  # 타일 그래프 (fill로 매핑)
+  scale_fill_viridis_c(name = "degC") +  # 색상 스케일 (색상 맵 설정)
+  theme_bw() +  # 흑백 테마
+  xlab("Longitude (deg)") +  # x축 레이블
+  ylab("Latitude (deg)") +  # y축 레이블
+  geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+  coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+  ggtitle("First EOF - Spatial Distribution")  # 그래프 제목
+
+
+
+
+# 1. 데이터 준비
+X <- T_ST_wide
+Y <- R_ST_wide
+
+
+# 2. CCA 수행
+cc <- cancor(X, Y)
+
+# Canonical Variables
+CCA_df <- data.frame(t = 1:nt, CCAvar1 = (X %*% cc$xcoef[,1])[,1], CCAvar2 = (Y %*% cc$ycoef[,1])[,1])
+
+t_breaks <- seq(1, nt, length.out = 6)
+year_breaks <- seq(1981, 2022, length.out = 6)
+
+ggplot(CCA_df) + 
+  geom_line(aes(t, CCAvar1), col = 'steelblue') +
+  geom_line(aes(t, CCAvar2), col= 'firebrick')
+
+# CCA 선형 계수
+cc_locs <- cbind(locs, cc$xcoef[,1], cc$ycoef[,1])
+colnames(cc_locs)[c(ncol(cc_locs)-1,ncol(cc_locs))] <- c('cca_varable_a', 'cca_varable_b')
+
+# ggplot(cc_locs) + 
+#   geom_point(aes(x = long, y = lat, color = cca_varable_b)) +  # 타일 그래프 (fill로 매핑)
+#   scale_fill_viridis_c(name = "degC") +  # 색상 스케일 (색상 맵 설정)
+#   theme_bw() +  # 흑백 테마
+#   xlab("Longitude (deg)") +  # x축 레이블
+#   ylab("Latitude (deg)") +  # y축 레이블
+#   geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+#   coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+#   ggtitle("Canonical Variable")  # 그래프 제목
+# 
+
+# cc_locs <- cc_locs[, -c(6,7)]
+
+# long과 lat을 기준으로 각 Canonical Variable을 facet으로 분리
+cc_locs_long <- cc_locs %>%
+  pivot_longer(cols = c(cca_varable_a, cca_varable_b), names_to = "Variable", values_to = "Value")
+
+CCA_plot <- ggplot(cc_locs_long) + 
+  geom_point(aes(x = long, y = lat, color = Value)) +  # 두 변수를 color로 매핑
+  scale_color_viridis_c() +  # 색상 스케일 (색상 맵 설정)
+  theme_bw() +  # 흑백 테마
+  xlab("Longitude (deg)") +  # x축 레이블
+  ylab("Latitude (deg)") +  # y축 레이블
+  geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+  coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+  facet_wrap(~ Variable) +  # 각 Canonical Variable을 패널로 나눔
+  ggtitle("Canonical Variables A and B")  # 그래프 제목
+
+
+# 두 변수 간의 차이 plot
+cc_locs$cca_diff <- abs(cc_locs$cca_varable_a - cc_locs$cca_varable_b)
+ggplot(cc_locs) + 
+  geom_point(aes(x = long, y = lat, color = cca_diff), size = 3) +  # 차이를 color로 매핑
+  scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "Difference") +  # 색상 스케일
+  theme_bw() +  # 흑백 테마
+  xlab("Longitude (deg)") +  # x축 레이블
+  ylab("Latitude (deg)") +  # y축 레이블
+  geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+  coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+  ggtitle("Difference between CCA Variables A and B")  # 그래프 제목
+
+
+# 두 변수 간의 곱 계산
+cc_locs$cca_ratio <- cc_locs$cca_varable_a * cc_locs$cca_varable_b
+
+# ggplot(cc_locs) + 
+#   geom_point(aes(x = long, y = lat, color = cca_ratio), size = 3) +  # 비율을 color로 매핑
+#   scale_colour_gradient(name = "degC", low = "cyan", high = "blue") +  # 색상 스케일 설정
+#   theme_bw() +  # 흑백 테마
+#   xlab("Longitude (deg)") +  # x축 레이블
+#   ylab("Latitude (deg)") +  # y축 레이블
+#   geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+#   coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+#   ggtitle("Ratio between CCA Variables A and B")  # 그래프 제목
+
+# cca_ratio가 양수인지 음수인지 구분하는 새로운 변수 생성
+cc_locs$cca_sign <- ifelse(cc_locs$cca_ratio > 0, "Positive", "Negative")
+
+ggplot(cc_locs) + 
+  geom_point(aes(x = long, y = lat, color = cca_sign), size = 3) +  # 양수/음수를 color로 구분
+  scale_color_manual(values = c("Positive" = "blue", "Negative" = "red")) +  # 색상 매핑 설정
+  theme_bw() +  # 흑백 테마
+  xlab("Longitude (deg)") +  # x축 레이블
+  ylab("Latitude (deg)") +  # y축 레이블
+  geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+  coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+  ggtitle("CCA Ratio: Positive vs Negative")  # 그래프 제목
