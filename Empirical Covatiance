@@ -1,0 +1,101 @@
+
+# Covariance
+
+# 두 모델 생성
+model_with_year <- lm(mean_z_temp ~ ele + Year + mean_z_rainfall, data = July_3)
+model_without_year <- lm(mean_z_temp ~ ele + Year + max_z_rainfall, data = July_3)
+
+# AIC 및 BIC 비교
+aic_with_year <- AIC(model_with_year)
+aic_without_year <- AIC(model_without_year)
+
+bic_with_year <- BIC(model_with_year)
+bic_without_year <- BIC(model_without_year)
+
+cat("AIC with Year:", aic_with_year, "\n")
+cat("AIC without Year:", aic_without_year, "\n")
+cat("BIC with Year:", bic_with_year, "\n")
+cat("BIC without Year:", bic_without_year, "\n")
+
+# F-test (ANOVA)로 두 모델 비교
+anova(model_without_year, model_with_year)
+
+# R² 비교
+summary(model_with_year)$r.squared
+summary(model_without_year)$r.squared
+
+# year 추가한 모델이 더 적합하다
+
+lm_July <- model_with_year
+
+# July 데이터프레임에 잔차 추가
+July_3$residuals <- lm_July$residuals
+
+# 잔차에 선형성이 있따고 생각
+dwtest(lm_July)
+
+
+# 패널 데이터 형식으로 변환
+pdata <- pdata.frame(July_3, index = c("Location", "Year"))
+pdata$Year <- as.numeric(as.character(pdata$Year))
+
+
+# 패널 데이터 회귀 모델
+model <- plm(mean_z_temp ~ ele + Year + mean_z_rainfall, data = pdata, model = "random")
+summary(model)
+
+July_3$residuals <- residuals(model)
+
+# 동일한 시간대의 잔차를 평균으로 요약
+mean_residuals <- aggregate(residuals ~ Year, data = July_3, FUN = mean)
+
+# 평균 잔차에 대해 ACF 분석
+acf(mean_residuals$residuals)
+
+
+# 잔차를 Year에 따라 시각화
+ggplot(July_3) +
+  geom_point(aes(x = Year, y = residuals)) +  # 각 Day별 잔차를 점으로 표시
+  labs(title = "Residuals vs. Year",
+       x = "Year",
+       y = "Residuals") +
+  theme_minimal()
+
+
+
+# 공간 정보 정리 (spat_df 준비)
+spat_df <- July_3 %>%
+  filter(Year == 1981) %>%
+  dplyr::select(lon = long, lat) %>%  # `long`을 `lon`으로 변경
+  arrange(lon, lat)
+
+# 관측소 수 확인
+m <- nrow(spat_df)
+
+# 잔차 데이터 준비
+X <- July_3 %>% 
+  dplyr::select(lon = long, lat, residuals, Year) %>%  # `long`을 `lon`으로 변경
+  spread(Year, residuals) %>% 
+  dplyr::select(-lat, -lon) %>% 
+  t()
+
+colnames(X) <- X[1,]
+X <- X[-1,]
+
+# Lag-0 및 Lag-1 공분산 행렬 계산
+Lag0_cov <- cov(X, use = 'complete.obs')
+Lag1_cov <- cov(X[-1, ], X[-nrow(X), ], use = 'complete.obs')
+
+# 경도 구간화 (5개의 점으로 4개의 구간을 나누어 결론적으로 4개의 그래프가 나오도록 됨)
+spat_df$n <- 1:nrow(spat_df)
+lim_lon <- range(spat_df$lon)
+lon_strips <- c(lim_lon[1], 127, 128.5, lim_lon[2])
+
+spat_df$lon_strip <- cut(spat_df$lon,  # `long`이 아닌 `lon` 사용
+                         lon_strips,   # 해당 경도 구간으로 구분
+                         labels = FALSE, 
+                         include.lowest = TRUE)
+
+# plot_cov_strips 함수 사용 (함수 이미 제공됨)
+plot_cov_strips(Lag0_cov, spat_df)
+plot_cov_strips(Lag1_cov, spat_df)
