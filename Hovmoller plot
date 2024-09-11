@@ -1,0 +1,28 @@
+# Hovmoller plot
+lim_lat <- range(overall_July$lat)
+lim_t <- range(overall_July$Year)
+
+lat_axis <- seq(lat_min, lat_max, length = 25)
+t_axis <- seq(lim_t[1], lim_t[2], length = 100)
+
+lat_t_grid <- expand.grid(lat = lat_axis, t = t_axis)
+
+July_grid <- July_3
+dists <- abs(outer(July_3$lat, lat_axis, "-"))
+July_grid$lat <- lat_axis[apply(dists,1, which.min)]
+
+July_Hov <- group_by(July_grid, lat, Year) %>% summarise(mu = mean(mean_z_temp), max = max(mean_z_temp))
+
+July_Hovmoller_mean <- ggplot(July_Hov) + geom_tile(aes(x = lat, y = Year, fill = mu)) +
+  fill_scale(name = 'degF') + scale_y_reverse() + 
+  labs(title = 'July Hovmoller plot', x = 'Latitude (degrees)', y = 'Year number(year)') + 
+  theme_bw()
+
+July_Hovmoller_mean
+
+July_Hovmoller_max <- ggplot(July_Hov) + geom_tile(aes(x = lat, y = Year, fill = max)) +
+  fill_scale(name = 'degF') + scale_y_reverse() + 
+  labs(title = 'July Hovmoller plot', x = 'Latitude (degrees)', y = 'Year number(year)') + 
+  theme_bw()
+
+July_Hovmoller_max
