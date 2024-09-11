@@ -1,0 +1,30 @@
+## ------------------------------------------------------------------------
+lim_lat <- range(July_3$lat)
+lim_lon <- range(July_3$long)
+lim_t <- range(July_3$Year)
+
+colnames(July_3)[11] <- 'lon'
+
+pred_grid <- expand.grid(lon = seq(lim_lon[1], lim_lon[2], length = 20),
+                         lat = seq(lim_lat[1], lim_lat[2], length = 20),
+                         Year = seq(lim_t[1], lim_t[2], length = 6))
+
+## ------------------------------------------------------------------------
+Temp_July_idw <- idw(formula = mean_z_temp ~ 1,            # dep. variable
+                     locations = ~ lon + lat + Year, # inputs
+                     data = July_3,          # data set
+                     newdata = pred_grid,        # prediction grid
+                     idp = 5)                    # inv. dist. pow.
+
+## ------------------------------------------------------------------------
+IDW_plot <- ggplot(Temp_July_idw) +
+    geom_tile(aes(x = lon, y = lat,
+                  fill = var1.pred)) +
+    fill_scale(name = "degF") +    # attach color scale
+    xlab("Longitude (deg)") +           # x-axis label
+    ylab("Latitude (deg)") +            # y-axis label
+    facet_wrap(~ Year, ncol = 3) +       # facet by day
+  geom_sf(data = korea_map, fill = NA, color = "black") +  # 한국 지도 추가
+  coord_sf(xlim = c(124, 132), ylim = c(33, 39)) +  # 한국 좌표로 줌인
+  ggtitle("IDW plot") +  # 그래프 제목
+  theme_bw()                          # B&W theme
