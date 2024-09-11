@@ -1,0 +1,36 @@
+
+# 고유한 위치와 시간 추출
+unique_locations <- unique(July_3[, c("long", "lat")])
+unique_times <- as.Date(paste0(unique(time_values), "-07-15"))
+
+# SpatialPoints 객체 다시 생성 (고유 위치 사용)
+sp_points_unique <- SpatialPoints(unique_locations, proj4string = CRS("+proj=longlat +ellps=WGS84 +no_defs"))
+colnames(sp_points_unique@coords) <- c('lon', 'lat')
+
+July_ar <- arrange(July_3, Year, Location)
+
+# STIDF 객체 생성
+stfdf_data <- STFDF(sp=sp_points_unique, time=unique_times, data=dplyr::select(July_ar, Year, mean_z_temp, max_z_temp, mean_z_rainfall, ele, lat))
+
+
+# 전체 데이터에서 최대 거리 계산 (예: 경도와 위도를 기반으로)
+max_dist <- max(spDists(sp_points_unique))
+
+
+
+# Variogram 계산
+mean_vv <- variogram(object = mean_z_temp ~ 1 + lat + ele + mean_z_rainfall, 
+                    data = stfdf_data,
+                    tlags = 1:20)             # tunit을 명시적으로 설정
+
+max_vv <- variogram(object = max_z_temp ~ 1 + lat + ele + mean_z_rainfall, 
+                data = stfdf_data,
+                tlags = 1:20)             # tunit을 명시적으로 설정
+
+
+mean_vv$timelag <- mean_vv$timelag / 365
+max_vv$timelag <- max_vv$timelag / 365
+
+
+plot(mean_vv, ylab = 'time lag (years)')
+plot(max_vv, ylab = 'time lag (years)')
