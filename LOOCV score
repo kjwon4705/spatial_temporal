@@ -1,0 +1,55 @@
+## ------------------------------------------------------------------------
+LOOCV_score <- function(Wt_fun, theta, dist_mat, Z) {
+  Wtilde <- Wt_fun(theta, dist_mat)
+  CV <- 0
+  for(i in 1:length(Z)) {
+    Wtilde2 <- Wtilde[i,-i]
+    W2 <- Wtilde2 / sum(Wtilde2)
+    z_pred <- W2 %*% Z[-i]
+    CV[i] <- (z_pred - Z[i])^2
+  }
+  mean(CV)
+}
+
+## ------------------------------------------------------------------------
+LOOCV_score(Wt_fun = Wt_IDW,
+            theta = 5,
+            dist_mat = obs_obs_dist_mat,
+            Z = July_3$mean_z_temp)
+
+LOOCV_score(Wt_fun = Wt_Gauss,
+            theta = 0.5,
+            dist_mat = obs_obs_dist_mat,
+            Z = July_3$mean_z_temp)
+## ------------------------------------------------------------------------
+theta_IDW <- seq(3, 4, length = 21)
+theta_Gauss <- seq(1, 3, length = 21)
+CV_IDW <- CV_Gauss <- 0
+for(i in seq_along(theta_IDW)) {
+  CV_IDW[i] <- LOOCV_score(Wt_fun = Wt_IDW,
+                           theta = theta_IDW[i],
+                           dist_mat = obs_obs_dist_mat,
+                           Z = July_3$mean_z_temp)
+  
+  CV_Gauss[i] <- LOOCV_score(Wt_fun = Wt_Gauss,
+                             theta = theta_Gauss[i],
+                             dist_mat = obs_obs_dist_mat,
+                             Z = July_3$mean_z_temp)
+}
+
+## ------------------------------------------------------------------------
+par(mfrow = c(1,2))
+plot(theta_IDW, CV_IDW,
+     xlab = expression(alpha),
+     ylab = expression(CV[(m)](alpha)),type = 'o')
+plot(theta_Gauss, CV_Gauss,
+     xlab = expression(theta),
+     ylab = expression(CV[(m)](theta)), type = 'o')
+
+## ------------------------------------------------------------------------
+theta_IDW[which.min(CV_IDW)]
+min(CV_IDW)
+
+## ------------------------------------------------------------------------
+theta_Gauss[which.min(CV_Gauss)]
+min(CV_Gauss)
